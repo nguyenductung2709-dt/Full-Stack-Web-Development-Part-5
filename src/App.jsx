@@ -16,6 +16,8 @@ const App = () => {
   const [user, setUser] = useState(null)
   const [nameOfCreator, setNameOfCreator] = useState('')
   const [errorMessage, setErrorMessage] = useState(null)
+  const [loggedInUsername, setLoggedInUsername] = useState(''); 
+
 
 
   useEffect(() => {
@@ -31,6 +33,7 @@ const App = () => {
     if (loggedUserJSON) {
       const user = JSON.parse(loggedUserJSON)
       setUser(user)
+      setLoggedInUsername(user.username);
       blogService.setToken(user.token)
     }
   }, [])
@@ -47,6 +50,7 @@ const App = () => {
       ) 
       blogService.setToken(user.token)
       setUser(user)
+      setLoggedInUsername(user.username);
       setUsername('')
       setPassword('')
     } catch (exception) {
@@ -77,7 +81,7 @@ const App = () => {
   const blogFormRef = useRef()
 
   const blogForm = () => (
-    <Togglable buttonLabel='new blog' ref={blogFormRef}>
+    <Togglable buttonLabel='new blog' ref={blogFormRef} >
       <BlogForm createBlog={addBlog} />
     </Togglable>
     )
@@ -87,9 +91,10 @@ const App = () => {
     blogService
       .create(blogObject)
       .then(returnedBlog => {
+        returnedBlog.user = user;
         setNameOfCreator(user.name)
         setBlogs(blogs.concat(returnedBlog))
-        setErrorMessage(`a new blog ${blogObject.title} by ${blogObject.author} added`)
+        setErrorMessage(`a blog ${blogObject.title} by ${blogObject.author} added`)
         setTimeout(() => {
         setErrorMessage(null)
       }, 5000)
@@ -103,7 +108,11 @@ const App = () => {
       .update(updatedBlog)
       .then(returnedBlog => {
         setNameOfCreator(user.name);
-        setBlogs(blogs.map(blogItem => (blogItem.id === returnedBlog.id ? returnedBlog : blogItem)));
+        const updatedBlogs = blogs.map(blogItem =>
+          blogItem.id === returnedBlog.id ? returnedBlog : blogItem
+        );
+        const sortedBlogs = updatedBlogs.sort((a, b) => b.likes - a.likes);
+        setBlogs(sortedBlogs);
         setErrorMessage(`Liked blog: ${returnedBlog.title} by ${returnedBlog.author}`);
         setTimeout(() => {
           setErrorMessage(null);
@@ -113,27 +122,28 @@ const App = () => {
         setErrorMessage('Failed to like the blog');
       });
   };
+  
 
-  const deleteBlog = (blogToDelete) => {
-    blogService
-      .remove(blogToDelete.id) 
-      .then(() => {
+  const deleteBlog = async (blogToDelete) => {
+    try {
+      const confirmed = window.confirm(`Remove blog ${blogToDelete.title} by ${blogToDelete.author}`);
+      if (confirmed) {
+        await blogService.remove(blogToDelete.id);
         const updatedBlogs = blogs.filter(blog => blog.id !== blogToDelete.id);
         setBlogs(updatedBlogs);
         setErrorMessage(`Deleted blog: ${blogToDelete.title} by ${blogToDelete.author}`);
         setTimeout(() => {
           setErrorMessage(null);
         }, 5000);
-      })
-      .catch(error => {
-        setErrorMessage('Failed to delete the blog');
-        setTimeout(() => {
-          setErrorMessage(null);
-        }, 5000);
-      });
+      }
+    } catch (error) {
+      setErrorMessage('Failed to delete the blog');
+      setTimeout(() => {
+        setErrorMessage(null);
+      }, 5000);
+    }
   };
-  
-  
+    
   if (user === null) {
     return(
       <>
@@ -143,6 +153,7 @@ const App = () => {
         <div>
         username
           <input
+          id = 'username'
           type="text"
           value={username}
           name="Username"
@@ -153,6 +164,7 @@ const App = () => {
       <div>
         password
           <input
+          id = 'password'
           type="password"
           value={password}
           name="Password"
@@ -160,7 +172,7 @@ const App = () => {
           placeholder = "Password"
         />
       </div>
-      <button type="submit">login</button>
+      <button id = 'login-button' type="submit">login</button>
     </form>      
     </>
     )
@@ -172,7 +184,7 @@ const App = () => {
       <h2>blogs</h2>
       <p>{user.name} logged in</p> <button onClick = {handleLogout}>logout</button>  
       {blogForm()}
-      <Blog blogs={blogs} increaseLike={handleLike} deleteBlog={deleteBlog} nameOfCreator={nameOfCreator} />
+      <Blog blogs={blogs} increaseLike={handleLike} deleteBlog={deleteBlog} nameOfCreator={nameOfCreator} username={loggedInUsername}/>
     </div>
     )
   }
